@@ -14,12 +14,14 @@ namespace EasyPatchy3.Services
     {
         private readonly ApplicationDbContext _context;
         private readonly IStorageService _storageService;
+        private readonly ILogger<PatchService> _logger;
         private readonly string _hdiffPatchPath = "/usr/local/bin/hdiffz";
 
-        public PatchService(ApplicationDbContext context, IStorageService storageService)
+        public PatchService(ApplicationDbContext context, IStorageService storageService, ILogger<PatchService> logger)
         {
             _context = context;
             _storageService = storageService;
+            _logger = logger;
         }
 
         public async Task<Patch?> GetPatchAsync(int sourceVersionId, int targetVersionId)
@@ -121,6 +123,18 @@ namespace EasyPatchy3.Services
             var tempPatchFile = Path.GetTempFileName();
             try
             {
+                _logger.LogInformation($"Generating patch from {sourcePath} to {targetPath}");
+
+                // Verify source and target files exist
+                if (!File.Exists(sourcePath))
+                {
+                    throw new FileNotFoundException($"Source file not found: {sourcePath}");
+                }
+                if (!File.Exists(targetPath))
+                {
+                    throw new FileNotFoundException($"Target file not found: {targetPath}");
+                }
+
                 var process = new Process
                 {
                     StartInfo = new ProcessStartInfo
@@ -134,16 +148,34 @@ namespace EasyPatchy3.Services
                     }
                 };
 
+                _logger.LogInformation($"Running HDiffPatch command: {_hdiffPatchPath} {process.StartInfo.Arguments}");
+
                 process.Start();
+                var outputTask = process.StandardOutput.ReadToEndAsync();
+                var errorTask = process.StandardError.ReadToEndAsync();
+
                 await process.WaitForExitAsync();
+
+                var output = await outputTask;
+                var error = await errorTask;
+
+                _logger.LogInformation($"HDiffPatch output: {output}");
 
                 if (process.ExitCode != 0)
                 {
-                    var error = await process.StandardError.ReadToEndAsync();
-                    throw new InvalidOperationException($"HDiff failed: {error}");
+                    _logger.LogError($"HDiffPatch failed with exit code {process.ExitCode}. Error: {error}");
+                    throw new InvalidOperationException($"HDiff failed with exit code {process.ExitCode}: {error}");
                 }
 
-                return await File.ReadAllBytesAsync(tempPatchFile);
+                if (!File.Exists(tempPatchFile))
+                {
+                    throw new InvalidOperationException("HDiffPatch completed but no patch file was generated");
+                }
+
+                var patchData = await File.ReadAllBytesAsync(tempPatchFile);
+                _logger.LogInformation($"Generated patch file of size {patchData.Length} bytes");
+
+                return patchData;
             }
             finally
             {

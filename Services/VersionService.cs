@@ -14,13 +14,13 @@ namespace EasyPatchy3.Services
     {
         private readonly ApplicationDbContext _context;
         private readonly IStorageService _storageService;
-        private readonly IPatchService _patchService;
+        private readonly ILogger<VersionService> _logger;
 
-        public VersionService(ApplicationDbContext context, IStorageService storageService, IPatchService patchService)
+        public VersionService(ApplicationDbContext context, IStorageService storageService, ILogger<VersionService> logger)
         {
             _context = context;
             _storageService = storageService;
-            _patchService = patchService;
+            _logger = logger;
         }
 
         public async Task<AppVersion?> GetVersionAsync(int id)
@@ -63,8 +63,9 @@ namespace EasyPatchy3.Services
             _context.Versions.Add(version);
             await _context.SaveChangesAsync();
 
-            await _patchService.GenerateAllPatchesForVersionAsync(version.Id);
+            _logger.LogInformation($"Version '{name}' created successfully with ID {version.Id}");
 
+            // Note: Patch generation will be done separately to avoid circular dependencies
             return version;
         }
 

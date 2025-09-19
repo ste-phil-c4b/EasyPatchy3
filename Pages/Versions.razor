@@ -1,5 +1,6 @@
 @page "/versions"
 @inject IVersionService VersionService
+@inject IPatchService PatchService
 @inject ISnackbar Snackbar
 @inject IStorageService StorageService
 @inject IJSRuntime JSRuntime
@@ -229,7 +230,22 @@
             // Clean up temp files
             try { Directory.Delete(tempPath, true); } catch { }
 
-            await Task.Delay(2000); // Simulate patch generation time
+            // Generate patches for this new version
+            uploadProgress = "Generating patches...";
+            StateHasChanged();
+
+            try
+            {
+                await PatchService.GenerateAllPatchesForVersionAsync(version.Id);
+                uploadProgress = "Patches generated successfully!";
+            }
+            catch (Exception patchEx)
+            {
+                uploadProgress = $"Version uploaded but patch generation failed: {patchEx.Message}";
+                Snackbar.Add($"Patches could not be generated: {patchEx.Message}", Severity.Warning);
+            }
+
+            await Task.Delay(1000);
 
             isGeneratingPatches = false;
             uploadProgress = $"Version '{version.Name}' uploaded and patches generated successfully!";
