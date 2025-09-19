@@ -3,7 +3,7 @@ Microsoft Visual Studio Solution File, Format Version 12.00
 # Visual Studio Version 17
 VisualStudioVersion = 17.0.31903.59
 MinimumVisualStudioVersion = 10.0.40219.1
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "EasyPatchy3", "EasyPatchy3.csproj", "{A4167554-9DF6-4CF8-8886-CCFF93760434}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "EasyPatchy3", "EasyPatchy3.App\EasyPatchy3.csproj", "{A4167554-9DF6-4CF8-8886-CCFF93760434}"
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "EasyPatchy3.Tests", "EasyPatchy3.Tests\EasyPatchy3.Tests.csproj", "{1E5DDA29-958F-4351-9D3A-686B4ED55827}"
 EndProject

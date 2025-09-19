@@ -28,7 +28,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\EasyPatchy3.csproj" />
+    <ProjectReference Include="..\EasyPatchy3.App\EasyPatchy3.csproj" />
   </ItemGroup>
 
   <ItemGroup>

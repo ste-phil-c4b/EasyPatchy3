@@ -43,6 +43,31 @@ EasyPatchy3 is a web-based application for generating and managing binary patche
 - **Storage**: Local file system for artifacts and patches (mounted as Docker volume)
 - **Orchestration**: Docker Compose for multi-container management
 
+## Project Structure
+
+```
+EasyPatchy3/
+├── EasyPatchy3.App/          # Main Blazor application
+│   ├── Data/                 # Entity Framework models and DbContext
+│   ├── Services/             # Business logic services
+│   ├── Pages/                # Blazor pages and components
+│   ├── Shared/               # Shared UI components
+│   ├── wwwroot/              # Static web assets
+│   ├── Migrations/           # EF Core database migrations
+│   ├── Program.cs            # Application entry point
+│   ├── EasyPatchy3.csproj    # Project file
+│   └── appsettings.json      # Configuration
+├── EasyPatchy3.Tests/        # Unit and integration tests
+│   ├── TestData/             # Test version samples
+│   ├── VersionServiceTests.cs # Version management tests
+│   ├── StorageServiceTests.cs # File storage tests
+│   └── README.md             # Test documentation
+├── Dockerfile                # Docker build configuration
+├── docker-compose.yml        # Multi-container orchestration
+├── EasyPatchy3.sln          # Visual Studio solution file
+└── README.md                 # This file
+```
+
 ## Architecture
 
 ### Data Model

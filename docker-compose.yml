@@ -20,8 +20,8 @@ services:
 
   app:
     build:
-      context: .
-      dockerfile: Dockerfile
+      context: ./EasyPatchy3.App
+      dockerfile: ../Dockerfile
     container_name: easypatch3-app
     environment:
       ConnectionStrings__DefaultConnection: "Host=postgres;Database=easypatch3;Username=easypatch3;Password=easypatch3"
