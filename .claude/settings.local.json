@@ -13,7 +13,8 @@
       "Bash(git commit:*)",
       "Bash(docker logs:*)",
       "Bash(docker exec:*)",
-      "Bash(dotnet sln add:*)"
+      "Bash(dotnet sln add:*)",
+      "Bash(dotnet test:*)"
     ],
     "deny": [],
     "ask": []
