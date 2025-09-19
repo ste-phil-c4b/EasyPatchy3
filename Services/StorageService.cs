@@ -31,7 +31,7 @@ namespace EasyPatchy3.Services
                 File.Delete(zipPath);
             }
 
-            await Task.Run(() => ZipFile.CreateFromDirectory(folderPath, zipPath));
+            await Task.Run(() => ZipFile.CreateFromDirectory(folderPath, zipPath, CompressionLevel.SmallestSize, false));
             return zipPath;
         }
 

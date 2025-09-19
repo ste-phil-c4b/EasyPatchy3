@@ -140,7 +140,7 @@ namespace EasyPatchy3.Services
                     StartInfo = new ProcessStartInfo
                     {
                         FileName = _hdiffPatchPath,
-                        Arguments = $"\"{sourcePath}\" \"{targetPath}\" \"{tempPatchFile}\"",
+                        Arguments = $"-f \"{sourcePath}\" \"{targetPath}\" \"{tempPatchFile}\"",
                         UseShellExecute = false,
                         RedirectStandardOutput = true,
                         RedirectStandardError = true,

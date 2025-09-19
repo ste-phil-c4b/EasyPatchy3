@@ -29,7 +29,7 @@ services:
     ports:
       - "8080:8080"
     volumes:
-      - ./Storage:/app/Storage
+      - ./../Storage:/app/Storage
     depends_on:
       postgres:
         condition: service_healthy
