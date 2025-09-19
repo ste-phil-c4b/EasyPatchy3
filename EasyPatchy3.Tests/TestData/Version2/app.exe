@@ -1,0 +1,6 @@
+This is a mock executable file for Version 1.1.0
+It contains some binary-like content to simulate an application binary.
+Version: 1.1.0
+Build: 2024-02-15
+Features: Basic functionality, Login system, User management, Reporting module
+Bug fixes: Fixed authentication timeout, Database connection pooling

@@ -90,7 +90,7 @@
     private bool isUploading = false;
     private bool isGeneratingPatches = false;
     private string versionName = string.Empty;
-    private string description = string.Empty;
+    private string? description;
     private List<IBrowserFile> uploadedFiles = new();
     private string? uploadProgress;
     private long maxFileSize = 500 * 1024 * 1024; // 500 MB per file
@@ -254,7 +254,7 @@
 
             // Reset form
             versionName = string.Empty;
-            description = string.Empty;
+            description = null;
             uploadedFiles.Clear();
             totalSize = 0;
             await form.ResetAsync();

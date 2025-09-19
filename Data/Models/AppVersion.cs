@@ -7,7 +7,7 @@ namespace EasyPatchy3.Data.Models
     {
         public int Id { get; set; }
         public string Name { get; set; } = string.Empty;
-        public string Description { get; set; } = string.Empty;
+        public string? Description { get; set; }
         public DateTime CreatedAt { get; set; }
         public long Size { get; set; }
         public string Hash { get; set; } = string.Empty;

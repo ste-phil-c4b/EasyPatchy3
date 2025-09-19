@@ -1,0 +1,7 @@
+Mock DLL content for API gateway v1.0.0
+New API gateway module:
+- Request routing
+- Rate limiting
+- Authentication middleware
+- Load balancing
+- API versioning

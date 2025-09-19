@@ -9,7 +9,7 @@ namespace EasyPatchy3.Services
         Task<AppVersion?> GetVersionAsync(int id);
         Task<AppVersion?> GetVersionByNameAsync(string name);
         Task<List<AppVersion>> GetAllVersionsAsync();
-        Task<AppVersion> CreateVersionAsync(string name, string description, string folderPath);
+        Task<AppVersion> CreateVersionAsync(string name, string? description, string folderPath);
         Task DeleteVersionAsync(int id);
     }
 }

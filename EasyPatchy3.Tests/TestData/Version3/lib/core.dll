@@ -1,0 +1,8 @@
+Mock DLL content for core library v2.0.0
+Completely refactored core functionality:
+- Authentication module (with MFA support)
+- Database access layer (with read replica support)
+- Advanced utilities
+- Enhanced error handling
+- Performance optimizations
+- New caching layer

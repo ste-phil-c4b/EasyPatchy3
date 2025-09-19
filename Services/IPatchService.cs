@@ -11,5 +11,6 @@ namespace EasyPatchy3.Services
         Task<Patch> GeneratePatchAsync(int sourceVersionId, int targetVersionId);
         Task<List<Patch>> GenerateAllPatchesForVersionAsync(int newVersionId);
         Task<byte[]> GetPatchFileAsync(int patchId);
+        Task<bool> ApplyPatchAsync(string sourceArchivePath, string patchFilePath, string outputPath);
     }
 }

@@ -1,0 +1,7 @@
+Mock DLL content for core library v1.1.0
+Contains core functionality including:
+- Authentication module (updated with session management)
+- Database access layer (with connection pooling)
+- Basic utilities
+- Error handling
+- New security features

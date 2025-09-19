@@ -1,0 +1,19 @@
+{
+  "version": "1.1.0",
+  "database": {
+    "host": "localhost",
+    "port": 5432,
+    "name": "myapp",
+    "poolSize": 10
+  },
+  "features": {
+    "login": true,
+    "userManagement": true,
+    "reporting": true,
+    "analytics": false
+  },
+  "security": {
+    "sessionTimeout": 3600,
+    "encryptionEnabled": true
+  }
+}

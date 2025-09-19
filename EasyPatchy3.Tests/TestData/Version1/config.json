@@ -1,0 +1,13 @@
+{
+  "version": "1.0.0",
+  "database": {
+    "host": "localhost",
+    "port": 5432,
+    "name": "myapp"
+  },
+  "features": {
+    "login": true,
+    "userManagement": true,
+    "reporting": false
+  }
+}

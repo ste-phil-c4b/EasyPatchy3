@@ -38,8 +38,12 @@ namespace EasyPatchy3.Services
             return await _context.Versions.OrderByDescending(v => v.CreatedAt).ToListAsync();
         }
 
-        public async Task<AppVersion> CreateVersionAsync(string name, string description, string folderPath)
+        public async Task<AppVersion> CreateVersionAsync(string name, string? description, string folderPath)
         {
+            // Validate input parameters
+            ValidateVersionName(name);
+            ValidateFolderPath(folderPath);
+
             var existingVersion = await GetVersionByNameAsync(name);
             if (existingVersion != null)
             {
@@ -105,6 +109,70 @@ namespace EasyPatchy3.Services
         {
             return Directory.GetFiles(folderPath, "*", SearchOption.AllDirectories)
                 .Sum(file => new FileInfo(file).Length);
+        }
+
+        private void ValidateVersionName(string name)
+        {
+            if (string.IsNullOrWhiteSpace(name))
+            {
+                throw new ArgumentException("Version name cannot be null or empty", nameof(name));
+            }
+
+            if (name.Length > 200)
+            {
+                throw new ArgumentException("Version name cannot exceed 200 characters", nameof(name));
+            }
+
+            // Check for invalid characters that could cause issues in file systems or databases
+            var invalidChars = Path.GetInvalidFileNameChars().Concat(new char[] { '<', '>', '|', '"', '*', '?', ':', '\\', '/' });
+            if (name.IndexOfAny(invalidChars.ToArray()) >= 0)
+            {
+                throw new ArgumentException($"Version name contains invalid characters: {name}", nameof(name));
+            }
+        }
+
+        private void ValidateFolderPath(string folderPath)
+        {
+            if (string.IsNullOrWhiteSpace(folderPath))
+            {
+                throw new ArgumentException("Folder path cannot be null or empty", nameof(folderPath));
+            }
+
+            try
+            {
+                // Get the full path to resolve any relative path components and prevent traversal
+                var fullPath = Path.GetFullPath(folderPath);
+
+                // Ensure the path exists and is a directory
+                if (!Directory.Exists(fullPath))
+                {
+                    throw new DirectoryNotFoundException($"Directory not found: {folderPath}");
+                }
+
+                // Basic path traversal protection
+                if (fullPath.Contains(".."))
+                {
+                    throw new ArgumentException($"Path traversal detected in folder path: {folderPath}", nameof(folderPath));
+                }
+
+                // Check if directory is accessible and contains files
+                try
+                {
+                    var files = Directory.GetFiles(fullPath, "*", SearchOption.TopDirectoryOnly);
+                    if (files.Length == 0)
+                    {
+                        _logger.LogWarning($"Warning: Directory '{folderPath}' is empty");
+                    }
+                }
+                catch (UnauthorizedAccessException)
+                {
+                    throw new UnauthorizedAccessException($"Access denied to directory: {folderPath}");
+                }
+            }
+            catch (Exception ex) when (!(ex is ArgumentException || ex is DirectoryNotFoundException || ex is UnauthorizedAccessException))
+            {
+                throw new ArgumentException($"Invalid folder path: {folderPath}", nameof(folderPath), ex);
+            }
         }
     }
 }

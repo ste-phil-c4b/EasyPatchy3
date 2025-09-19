@@ -125,12 +125,17 @@ namespace EasyPatchy3.Services
             {
                 _logger.LogInformation($"Generating patch from {sourcePath} to {targetPath}");
 
+                // Sanitize and validate file paths to prevent command injection
+                var sanitizedSourcePath = ValidateAndSanitizePath(sourcePath, "source");
+                var sanitizedTargetPath = ValidateAndSanitizePath(targetPath, "target");
+                var sanitizedTempPath = ValidateAndSanitizePath(tempPatchFile, "temp");
+
                 // Verify source and target files exist
-                if (!File.Exists(sourcePath))
+                if (!File.Exists(sanitizedSourcePath))
                 {
                     throw new FileNotFoundException($"Source file not found: {sourcePath}");
                 }
-                if (!File.Exists(targetPath))
+                if (!File.Exists(sanitizedTargetPath))
                 {
                     throw new FileNotFoundException($"Target file not found: {targetPath}");
                 }
@@ -140,7 +145,6 @@ namespace EasyPatchy3.Services
                     StartInfo = new ProcessStartInfo
                     {
                         FileName = _hdiffPatchPath,
-                        Arguments = $"-f \"{sourcePath}\" \"{targetPath}\" \"{tempPatchFile}\"",
                         UseShellExecute = false,
                         RedirectStandardOutput = true,
                         RedirectStandardError = true,
@@ -148,7 +152,13 @@ namespace EasyPatchy3.Services
                     }
                 };
 
-                _logger.LogInformation($"Running HDiffPatch command: {_hdiffPatchPath} {process.StartInfo.Arguments}");
+                // Use ArgumentList instead of Arguments to prevent injection
+                process.StartInfo.ArgumentList.Add("-f");
+                process.StartInfo.ArgumentList.Add(sanitizedSourcePath);
+                process.StartInfo.ArgumentList.Add(sanitizedTargetPath);
+                process.StartInfo.ArgumentList.Add(sanitizedTempPath);
+
+                _logger.LogInformation($"Running HDiffPatch command with sanitized paths");
 
                 process.Start();
                 var outputTask = process.StandardOutput.ReadToEndAsync();
@@ -183,6 +193,120 @@ namespace EasyPatchy3.Services
                 {
                     File.Delete(tempPatchFile);
                 }
+            }
+        }
+
+        private string ValidateAndSanitizePath(string filePath, string pathType)
+        {
+            if (string.IsNullOrWhiteSpace(filePath))
+            {
+                throw new ArgumentException($"{pathType} path cannot be null or empty", nameof(filePath));
+            }
+
+            try
+            {
+                // Get the full path to resolve any relative path components and prevent traversal
+                var fullPath = Path.GetFullPath(filePath);
+
+                // Additional validation: ensure path doesn't contain dangerous characters
+                var fileName = Path.GetFileName(fullPath);
+                if (fileName.IndexOfAny(Path.GetInvalidFileNameChars()) >= 0)
+                {
+                    throw new ArgumentException($"Invalid characters in {pathType} file name: {fileName}");
+                }
+
+                // Validate the path exists within expected boundaries (basic sanity check)
+                if (fullPath.Contains("..") || fullPath.Contains("~"))
+                {
+                    throw new ArgumentException($"Path traversal detected in {pathType} path: {filePath}");
+                }
+
+                return fullPath;
+            }
+            catch (Exception ex) when (!(ex is ArgumentException))
+            {
+                throw new ArgumentException($"Invalid {pathType} path: {filePath}", nameof(filePath), ex);
+            }
+        }
+
+        public async Task<bool> ApplyPatchAsync(string sourceArchivePath, string patchFilePath, string outputPath)
+        {
+            try
+            {
+                _logger.LogInformation($"Applying patch from {sourceArchivePath} to {outputPath}");
+
+                // Validate and sanitize paths
+                var sanitizedSourcePath = ValidateAndSanitizePath(sourceArchivePath, "source archive");
+                var sanitizedPatchPath = ValidateAndSanitizePath(patchFilePath, "patch");
+                var sanitizedOutputPath = ValidateAndSanitizePath(outputPath, "output");
+
+                // Verify source archive and patch files exist
+                if (!File.Exists(sanitizedSourcePath))
+                {
+                    throw new FileNotFoundException($"Source archive not found: {sourceArchivePath}");
+                }
+                if (!File.Exists(sanitizedPatchPath))
+                {
+                    throw new FileNotFoundException($"Patch file not found: {patchFilePath}");
+                }
+
+                // Create output directory if it doesn't exist
+                var outputDir = Path.GetDirectoryName(sanitizedOutputPath);
+                if (!string.IsNullOrEmpty(outputDir))
+                {
+                    Directory.CreateDirectory(outputDir);
+                }
+
+                var process = new Process
+                {
+                    StartInfo = new ProcessStartInfo
+                    {
+                        FileName = "hpatchz", // Use hpatchz for applying patches
+                        UseShellExecute = false,
+                        RedirectStandardOutput = true,
+                        RedirectStandardError = true,
+                        CreateNoWindow = true
+                    }
+                };
+
+                // Use ArgumentList to prevent injection
+                process.StartInfo.ArgumentList.Add("-f"); // Force overwrite
+                process.StartInfo.ArgumentList.Add(sanitizedSourcePath);
+                process.StartInfo.ArgumentList.Add(sanitizedPatchPath);
+                process.StartInfo.ArgumentList.Add(sanitizedOutputPath);
+
+                _logger.LogInformation($"Running hpatchz command with sanitized paths");
+
+                process.Start();
+                var outputTask = process.StandardOutput.ReadToEndAsync();
+                var errorTask = process.StandardError.ReadToEndAsync();
+
+                await process.WaitForExitAsync();
+
+                var output = await outputTask;
+                var error = await errorTask;
+
+                _logger.LogInformation($"hpatchz output: {output}");
+
+                if (process.ExitCode != 0)
+                {
+                    _logger.LogError($"hpatchz failed with exit code {process.ExitCode}. Error: {error}");
+                    return false;
+                }
+
+                if (!File.Exists(sanitizedOutputPath))
+                {
+                    _logger.LogError("hpatchz completed but no output file was generated");
+                    return false;
+                }
+
+                _logger.LogInformation($"Patch applied successfully to {sanitizedOutputPath}");
+                return true;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, $"Error applying patch: {ex.Message}");
+                return false;
             }
         }
     }
