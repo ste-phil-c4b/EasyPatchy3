@@ -1,0 +1,185 @@
+@page "/browse"
+@inject IVersionService VersionService
+@inject IStorageService StorageService
+@inject ISnackbar Snackbar
+@inject IJSRuntime JSRuntime
+
+<PageTitle>Browse Versions</PageTitle>
+
+<MudContainer MaxWidth="MaxWidth.Large" Class="mt-4">
+    <MudText Typo="Typo.h4" Class="mb-4">Browse Versions</MudText>
+
+    @if (versions == null)
+    {
+        <MudProgressCircular Indeterminate="true" />
+    }
+    else if (!versions.Any())
+    {
+        <MudAlert Severity="Severity.Info">No versions uploaded yet. <MudLink Href="/versions">Upload your first version</MudLink></MudAlert>
+    }
+    else
+    {
+        <MudTable Items="@versions" Hover="true" Striped="true" Filter="new Func<AppVersion,bool>(FilterFunc)">
+            <ToolBarContent>
+                <MudText Typo="Typo.h6">Uploaded Versions</MudText>
+                <MudSpacer />
+                <MudTextField @bind-Value="searchString" Placeholder="Search" Adornment="Adornment.Start" AdornmentIcon="@Icons.Material.Filled.Search" IconSize="Size.Medium" Class="mt-0"></MudTextField>
+            </ToolBarContent>
+            <HeaderContent>
+                <MudTh>Name</MudTh>
+                <MudTh>Description</MudTh>
+                <MudTh>Size</MudTh>
+                <MudTh>Hash</MudTh>
+                <MudTh>Created</MudTh>
+                <MudTh>Actions</MudTh>
+            </HeaderContent>
+            <RowTemplate>
+                <MudTd DataLabel="Name">@context.Name</MudTd>
+                <MudTd DataLabel="Description">@context.Description</MudTd>
+                <MudTd DataLabel="Size">@FormatFileSize(context.Size)</MudTd>
+                <MudTd DataLabel="Hash">
+                    <MudTooltip Text="@context.Hash">
+                        <MudText>@context.Hash.Substring(0, Math.Min(8, context.Hash.Length))...</MudText>
+                    </MudTooltip>
+                </MudTd>
+                <MudTd DataLabel="Created">@context.CreatedAt.ToLocalTime().ToString("g")</MudTd>
+                <MudTd DataLabel="Actions">
+                    <MudIconButton Icon="@Icons.Material.Filled.Download" Color="Color.Primary" OnClick="@(() => DownloadVersion(context))" Title="Download" />
+                    <MudIconButton Icon="@Icons.Material.Filled.Info" Color="Color.Info" OnClick="@(() => ShowVersionDetails(context))" Title="Details" />
+                    <MudIconButton Icon="@Icons.Material.Filled.Delete" Color="Color.Error" OnClick="@(() => DeleteVersion(context))" Title="Delete" />
+                </MudTd>
+            </RowTemplate>
+            <PagerContent>
+                <MudTablePager />
+            </PagerContent>
+        </MudTable>
+    }
+</MudContainer>
+
+<MudDialog @bind-IsVisible="showDetailsDialog">
+    <TitleContent>
+        <MudText Typo="Typo.h6">
+            @if (selectedVersion != null)
+            {
+                @selectedVersion.Name
+            }
+        </MudText>
+    </TitleContent>
+    <DialogContent>
+        @if (selectedVersion != null)
+        {
+            <MudGrid>
+                <MudItem xs="12">
+                    <MudText Typo="Typo.subtitle2">Description:</MudText>
+                    <MudText>@(string.IsNullOrEmpty(selectedVersion.Description) ? "No description" : selectedVersion.Description)</MudText>
+                </MudItem>
+                <MudItem xs="6">
+                    <MudText Typo="Typo.subtitle2">Size:</MudText>
+                    <MudText>@FormatFileSize(selectedVersion.Size)</MudText>
+                </MudItem>
+                <MudItem xs="6">
+                    <MudText Typo="Typo.subtitle2">Created:</MudText>
+                    <MudText>@selectedVersion.CreatedAt.ToLocalTime().ToString("F")</MudText>
+                </MudItem>
+                <MudItem xs="12">
+                    <MudText Typo="Typo.subtitle2">Hash:</MudText>
+                    <MudText Style="word-break: break-all;">@selectedVersion.Hash</MudText>
+                </MudItem>
+                <MudItem xs="12">
+                    <MudText Typo="Typo.subtitle2">Storage Path:</MudText>
+                    <MudText Style="word-break: break-all;">@selectedVersion.StoragePath</MudText>
+                </MudItem>
+            </MudGrid>
+        }
+    </DialogContent>
+    <DialogActions>
+        <MudButton Color="Color.Primary" OnClick="CloseDetailsDialog">Close</MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    private List<AppVersion>? versions;
+    private string searchString = "";
+    private bool showDetailsDialog;
+    private AppVersion? selectedVersion;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadVersions();
+    }
+
+    private async Task LoadVersions()
+    {
+        versions = await VersionService.GetAllVersionsAsync();
+    }
+
+    private bool FilterFunc(AppVersion version) => FilterFunc(version, searchString);
+
+    private bool FilterFunc(AppVersion version, string searchString)
+    {
+        if (string.IsNullOrWhiteSpace(searchString))
+            return true;
+        if (version.Name.Contains(searchString, StringComparison.OrdinalIgnoreCase))
+            return true;
+        if (!string.IsNullOrEmpty(version.Description) && version.Description.Contains(searchString, StringComparison.OrdinalIgnoreCase))
+            return true;
+        return false;
+    }
+
+    private string FormatFileSize(long bytes)
+    {
+        string[] sizes = { "B", "KB", "MB", "GB", "TB" };
+        int order = 0;
+        double size = bytes;
+        while (size >= 1024 && order < sizes.Length - 1)
+        {
+            order++;
+            size = size / 1024;
+        }
+        return $"{size:0.##} {sizes[order]}";
+    }
+
+    private async Task DownloadVersion(AppVersion version)
+    {
+        try
+        {
+            var fileBytes = await StorageService.GetVersionArchiveAsync(version.StoragePath);
+            var fileName = $"{version.Name}.zip";
+            await JSRuntime.InvokeVoidAsync("downloadFile", fileName, Convert.ToBase64String(fileBytes));
+            Snackbar.Add($"Downloaded {fileName}", Severity.Success);
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Error downloading version: {ex.Message}", Severity.Error);
+        }
+    }
+
+    private void ShowVersionDetails(AppVersion version)
+    {
+        selectedVersion = version;
+        showDetailsDialog = true;
+    }
+
+    private void CloseDetailsDialog()
+    {
+        showDetailsDialog = false;
+    }
+
+    private async Task DeleteVersion(AppVersion version)
+    {
+        var result = await JSRuntime.InvokeAsync<bool>("confirm", $"Are you sure you want to delete version '{version.Name}'?");
+        if (result)
+        {
+            try
+            {
+                await VersionService.DeleteVersionAsync(version.Id);
+                await LoadVersions();
+                Snackbar.Add($"Version '{version.Name}' deleted successfully", Severity.Success);
+            }
+            catch (Exception ex)
+            {
+                Snackbar.Add($"Error deleting version: {ex.Message}", Severity.Error);
+            }
+        }
+    }
+}

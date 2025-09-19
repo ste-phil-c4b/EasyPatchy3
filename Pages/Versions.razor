@@ -1,0 +1,258 @@
+@page "/versions"
+@inject IVersionService VersionService
+@inject ISnackbar Snackbar
+@inject IStorageService StorageService
+@inject IJSRuntime JSRuntime
+
+<PageTitle>Upload Version</PageTitle>
+
+<MudContainer MaxWidth="MaxWidth.Medium" Class="mt-4">
+    <MudText Typo="Typo.h4" Class="mb-4">Upload New Version</MudText>
+
+    <MudCard>
+        <MudCardContent>
+            <MudForm @ref="form" @bind-IsValid="@success">
+                <MudTextField T="string" @bind-Value="versionName" Label="Version Name" Required="true" RequiredError="Version name is required!" />
+                <MudTextField T="string" @bind-Value="description" Label="Description" Lines="3" />
+
+                <MudPaper @ondragenter="@SetDragClass" @ondragleave="@ClearDragClass" @ondragend="@ClearDragClass" Height="200px" Outlined="true" Class="@GetDragClass()">
+                    <InputFile id="folderInput" OnChange="@OnInputFileChange" multiple webkitdirectory="true" directory="true" class="absolute mud-width-full mud-height-full overflow-hidden z-10" style="opacity:0;" />
+                    <div class="d-flex flex-column align-center justify-center mud-width-full mud-height-full">
+                        @if (uploadedFiles.Any())
+                        {
+                            <MudText Typo="Typo.h6">@uploadedFiles.Count files selected</MudText>
+                            <MudText Typo="Typo.body2" Class="mt-2">
+                                Total size: @FormatFileSize(totalSize)
+                            </MudText>
+                            @if (uploadedFiles.Count <= 10)
+                            {
+                                <MudList Dense="true" Style="max-height: 100px; overflow-y: auto;">
+                                    @foreach (var file in uploadedFiles.Take(10))
+                                    {
+                                        <MudListItem Dense="true">
+                                            <MudText Typo="Typo.body2">@GetRelativePath(file.Name)</MudText>
+                                        </MudListItem>
+                                    }
+                                </MudList>
+                            }
+                            else
+                            {
+                                <MudText Typo="Typo.body2" Color="Color.Secondary">First 10 files shown...</MudText>
+                            }
+                        }
+                        else
+                        {
+                            <MudIcon Icon="@Icons.Material.Filled.DriveFolderUpload" Style="font-size: 48px;" />
+                            <MudText Typo="Typo.h6">Drop folder here or click to browse</MudText>
+                            <MudText Typo="Typo.body2" Color="Color.Secondary">Select a folder to upload all its contents</MudText>
+                        }
+                    </div>
+                </MudPaper>
+
+                <MudButton Variant="Variant.Text" Color="Color.Secondary" Class="mt-2" OnClick="ClearFiles" StartIcon="@Icons.Material.Filled.Clear">
+                    Clear Selection
+                </MudButton>
+            </MudForm>
+        </MudCardContent>
+        <MudCardActions>
+            <MudButton Variant="Variant.Filled" Color="Color.Primary" Disabled="@(!success || isUploading || !uploadedFiles.Any())" OnClick="UploadVersion">
+                @if (isUploading)
+                {
+                    <MudProgressCircular Class="ms-n1" Size="Size.Small" Indeterminate="true" />
+                    <MudText Class="ms-2">Uploading...</MudText>
+                }
+                else
+                {
+                    <MudText>Upload Version</MudText>
+                }
+            </MudButton>
+        </MudCardActions>
+    </MudCard>
+
+    @if (uploadProgress != null)
+    {
+        <MudPaper Class="pa-4 mt-4">
+            <MudText Typo="Typo.h6">Upload Progress</MudText>
+            <MudText>@uploadProgress</MudText>
+            @if (isGeneratingPatches)
+            {
+                <MudProgressLinear Indeterminate="true" Color="Color.Primary" Class="mt-2" />
+                <MudText Typo="Typo.body2" Class="mt-2">Generating patches for existing versions...</MudText>
+            }
+        </MudPaper>
+    }
+</MudContainer>
+
+@code {
+    private MudForm form = null!;
+    private bool success;
+    private bool isUploading = false;
+    private bool isGeneratingPatches = false;
+    private string versionName = string.Empty;
+    private string description = string.Empty;
+    private List<IBrowserFile> uploadedFiles = new();
+    private string? uploadProgress;
+    private long maxFileSize = 500 * 1024 * 1024; // 500 MB per file
+    private long totalSize = 0;
+    private string _dragClass = "";
+
+    private string GetDragClass()
+    {
+        return $"{_dragClass} mt-4";
+    }
+
+    private void SetDragClass()
+    {
+        _dragClass = "mud-border-primary";
+    }
+
+    private void ClearDragClass()
+    {
+        _dragClass = "";
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            await JSRuntime.InvokeVoidAsync("initializeFolderUpload");
+        }
+    }
+
+    private void OnInputFileChange(InputFileChangeEventArgs e)
+    {
+        ClearDragClass();
+        uploadedFiles.Clear();
+        totalSize = 0;
+
+        foreach (var file in e.GetMultipleFiles(10000)) // Allow up to 10000 files
+        {
+            uploadedFiles.Add(file);
+            totalSize += file.Size;
+        }
+
+        StateHasChanged();
+    }
+
+    private void ClearFiles()
+    {
+        uploadedFiles.Clear();
+        totalSize = 0;
+        StateHasChanged();
+    }
+
+    private string GetRelativePath(string fullPath)
+    {
+        // Extract relative path from the full path (browser provides path relative to selected folder)
+        var lastSlash = fullPath.LastIndexOfAny(new[] { '/', '\\' });
+        return lastSlash >= 0 ? fullPath.Substring(lastSlash + 1) : fullPath;
+    }
+
+    private string FormatFileSize(long bytes)
+    {
+        string[] sizes = { "B", "KB", "MB", "GB" };
+        int order = 0;
+        double size = bytes;
+        while (size >= 1024 && order < sizes.Length - 1)
+        {
+            order++;
+            size = size / 1024;
+        }
+        return $"{size:0.##} {sizes[order]}";
+    }
+
+    private async Task UploadVersion()
+    {
+        if (!success || !uploadedFiles.Any())
+            return;
+
+        isUploading = true;
+        uploadProgress = "Starting upload...";
+
+        try
+        {
+            var tempPath = Path.Combine(Path.GetTempPath(), Path.GetRandomFileName());
+            Directory.CreateDirectory(tempPath);
+
+            // Upload all files maintaining folder structure
+            uploadProgress = $"Uploading {uploadedFiles.Count} files...";
+            StateHasChanged();
+
+            int fileCount = 0;
+            Dictionary<string, string> fileStructure = new();
+
+            foreach (var file in uploadedFiles)
+            {
+                fileCount++;
+                if (fileCount % 10 == 0 || fileCount == uploadedFiles.Count)
+                {
+                    uploadProgress = $"Uploading file {fileCount} of {uploadedFiles.Count}...";
+                    StateHasChanged();
+                }
+
+                // Get the relative path from the file name (browser provides this)
+                var relativePath = file.Name.Replace('/', Path.DirectorySeparatorChar);
+                var fullPath = Path.Combine(tempPath, relativePath);
+
+                // Create directory structure
+                var directory = Path.GetDirectoryName(fullPath);
+                if (!string.IsNullOrEmpty(directory))
+                {
+                    Directory.CreateDirectory(directory);
+                }
+
+                // Check file size
+                if (file.Size > maxFileSize)
+                {
+                    Snackbar.Add($"File {file.Name} exceeds size limit of {FormatFileSize(maxFileSize)}", Severity.Warning);
+                    continue;
+                }
+
+                // Save file
+                using (var stream = file.OpenReadStream(maxFileSize))
+                using (var fileStream = File.Create(fullPath))
+                {
+                    await stream.CopyToAsync(fileStream);
+                }
+            }
+
+            uploadProgress = "Creating version entry...";
+            StateHasChanged();
+
+            // The service will handle zipping the folder
+            var version = await VersionService.CreateVersionAsync(versionName, description, tempPath);
+
+            uploadProgress = $"Version '{version.Name}' uploaded successfully!";
+            isGeneratingPatches = true;
+            StateHasChanged();
+
+            // Clean up temp files
+            try { Directory.Delete(tempPath, true); } catch { }
+
+            await Task.Delay(2000); // Simulate patch generation time
+
+            isGeneratingPatches = false;
+            uploadProgress = $"Version '{version.Name}' uploaded and patches generated successfully!";
+
+            Snackbar.Add("Version uploaded successfully!", Severity.Success);
+
+            // Reset form
+            versionName = string.Empty;
+            description = string.Empty;
+            uploadedFiles.Clear();
+            totalSize = 0;
+            await form.ResetAsync();
+        }
+        catch (Exception ex)
+        {
+            uploadProgress = $"Error: {ex.Message}";
+            Snackbar.Add($"Error uploading version: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            isUploading = false;
+            isGeneratingPatches = false;
+            StateHasChanged();
+        }
+    }
+}

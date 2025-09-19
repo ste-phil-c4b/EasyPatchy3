@@ -1,0 +1,127 @@
+﻿@page "/"
+@inject IVersionService VersionService
+
+<PageTitle>EasyPatchy3 - Home</PageTitle>
+
+<MudContainer MaxWidth="MaxWidth.Large" Class="mt-4">
+    <MudGrid>
+        <MudItem xs="12">
+            <MudText Typo="Typo.h3" Class="mb-4">Welcome to EasyPatchy3</MudText>
+            <MudText Typo="Typo.body1" Class="mb-4">
+                EasyPatchy3 is a powerful patch management system that helps you create and manage differential updates for your applications.
+            </MudText>
+        </MudItem>
+
+        <MudItem xs="12" sm="6" md="3">
+            <MudCard>
+                <MudCardContent>
+                    <MudIcon Icon="@Icons.Material.Filled.DriveFolderUpload" Size="Size.Large" Color="Color.Primary" />
+                    <MudText Typo="Typo.h6" Class="mt-2">Upload Files</MudText>
+                    <MudText Typo="Typo.body2">Upload folders with all contents</MudText>
+                </MudCardContent>
+                <MudCardActions>
+                    <MudButton Variant="Variant.Text" Color="Color.Primary" Href="/versions">Upload Files</MudButton>
+                </MudCardActions>
+            </MudCard>
+        </MudItem>
+
+        <MudItem xs="12" sm="6" md="3">
+            <MudCard>
+                <MudCardContent>
+                    <MudIcon Icon="@Icons.Material.Filled.FolderOpen" Size="Size.Large" Color="Color.Secondary" />
+                    <MudText Typo="Typo.h6" Class="mt-2">Browse Versions</MudText>
+                    <MudText Typo="Typo.body2">View all uploaded versions</MudText>
+                </MudCardContent>
+                <MudCardActions>
+                    <MudButton Variant="Variant.Text" Color="Color.Secondary" Href="/browse">Browse</MudButton>
+                </MudCardActions>
+            </MudCard>
+        </MudItem>
+
+        <MudItem xs="12" sm="6" md="3">
+            <MudCard>
+                <MudCardContent>
+                    <MudIcon Icon="@Icons.Material.Filled.CompareArrows" Size="Size.Large" Color="Color.Success" />
+                    <MudText Typo="Typo.h6" Class="mt-2">Patches</MudText>
+                    <MudText Typo="Typo.body2">Generate and manage patches</MudText>
+                </MudCardContent>
+                <MudCardActions>
+                    <MudButton Variant="Variant.Text" Color="Color.Success" Href="/patches">View Patches</MudButton>
+                </MudCardActions>
+            </MudCard>
+        </MudItem>
+
+        <MudItem xs="12" sm="6" md="3">
+            <MudCard>
+                <MudCardContent>
+                    <MudIcon Icon="@Icons.Material.Filled.Download" Size="Size.Large" Color="Color.Info" />
+                    <MudText Typo="Typo.h6" Class="mt-2">Downloads</MudText>
+                    <MudText Typo="Typo.body2">Download versions and patches</MudText>
+                </MudCardContent>
+                <MudCardActions>
+                    <MudButton Variant="Variant.Text" Color="Color.Info" Href="/downloads">Downloads</MudButton>
+                </MudCardActions>
+            </MudCard>
+        </MudItem>
+
+        <MudItem xs="12">
+            <MudPaper Class="pa-4">
+                <MudText Typo="Typo.h5" Class="mb-3">Recent Versions</MudText>
+                @if (recentVersions == null)
+                {
+                    <MudProgressCircular Indeterminate="true" />
+                }
+                else if (!recentVersions.Any())
+                {
+                    <MudText>No versions uploaded yet.</MudText>
+                }
+                else
+                {
+                    <MudSimpleTable Dense="true">
+                        <thead>
+                            <tr>
+                                <th>Version Name</th>
+                                <th>Description</th>
+                                <th>Size</th>
+                                <th>Created</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var version in recentVersions.Take(5))
+                            {
+                                <tr>
+                                    <td>@version.Name</td>
+                                    <td>@version.Description</td>
+                                    <td>@FormatFileSize(version.Size)</td>
+                                    <td>@version.CreatedAt.ToLocalTime().ToString("g")</td>
+                                </tr>
+                            }
+                        </tbody>
+                    </MudSimpleTable>
+                }
+            </MudPaper>
+        </MudItem>
+    </MudGrid>
+</MudContainer>
+
+@code {
+    private List<AppVersion>? recentVersions;
+
+    protected override async Task OnInitializedAsync()
+    {
+        recentVersions = await VersionService.GetAllVersionsAsync();
+    }
+
+    private string FormatFileSize(long bytes)
+    {
+        string[] sizes = { "B", "KB", "MB", "GB", "TB" };
+        int order = 0;
+        double size = bytes;
+        while (size >= 1024 && order < sizes.Length - 1)
+        {
+            order++;
+            size = size / 1024;
+        }
+        return $"{size:0.##} {sizes[order]}";
+    }
+}

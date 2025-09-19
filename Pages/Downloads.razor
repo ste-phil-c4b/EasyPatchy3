@@ -1,0 +1,240 @@
+@page "/downloads"
+@inject IVersionService VersionService
+@inject IPatchService PatchService
+@inject IStorageService StorageService
+@inject ISnackbar Snackbar
+@inject IJSRuntime JSRuntime
+
+<PageTitle>Downloads</PageTitle>
+
+<MudContainer MaxWidth="MaxWidth.Large" Class="mt-4">
+    <MudText Typo="Typo.h4" Class="mb-4">Download Center</MudText>
+
+    <MudTabs Elevation="2" Rounded="true" ApplyEffectsToContainer="true" PanelClass="pa-6">
+        <MudTabPanel Text="Versions">
+            <MudGrid>
+                @if (versions == null)
+                {
+                    <MudItem xs="12">
+                        <MudProgressCircular Indeterminate="true" />
+                    </MudItem>
+                }
+                else if (!versions.Any())
+                {
+                    <MudItem xs="12">
+                        <MudAlert Severity="Severity.Info">No versions available for download.</MudAlert>
+                    </MudItem>
+                }
+                else
+                {
+                    @foreach (var version in versions)
+                    {
+                        <MudItem xs="12" sm="6" md="4">
+                            <MudCard>
+                                <MudCardContent>
+                                    <MudText Typo="Typo.h6">@version.Name</MudText>
+                                    <MudText Typo="Typo.body2" Class="mb-2">@version.Description</MudText>
+                                    <MudChip Icon="@Icons.Material.Filled.Storage" Color="Color.Info" Size="Size.Small">
+                                        @FormatFileSize(version.Size)
+                                    </MudChip>
+                                    <MudChip Icon="@Icons.Material.Filled.CalendarToday" Color="Color.Default" Size="Size.Small">
+                                        @version.CreatedAt.ToLocalTime().ToString("d")
+                                    </MudChip>
+                                </MudCardContent>
+                                <MudCardActions>
+                                    <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.Download" OnClick="@(() => DownloadVersion(version))">
+                                        Download
+                                    </MudButton>
+                                </MudCardActions>
+                            </MudCard>
+                        </MudItem>
+                    }
+                }
+            </MudGrid>
+        </MudTabPanel>
+
+        <MudTabPanel Text="Patch Selector">
+            <MudGrid>
+                <MudItem xs="12" md="6">
+                    <MudCard>
+                        <MudCardContent>
+                            <MudText Typo="Typo.h6" Class="mb-3">Select Patch Path</MudText>
+                            <MudSelect T="AppVersion" @bind-Value="patchSourceVersion" Label="Current Version" Variant="Variant.Outlined">
+                                @if (versions != null)
+                                {
+                                    @foreach (var version in versions)
+                                    {
+                                        <MudSelectItem Value="@version">@version.Name</MudSelectItem>
+                                    }
+                                }
+                            </MudSelect>
+                            <MudSelect T="AppVersion" @bind-Value="patchTargetVersion" Label="Target Version" Variant="Variant.Outlined" Class="mt-3">
+                                @if (versions != null)
+                                {
+                                    @foreach (var version in versions.Where(v => v.Id != patchSourceVersion?.Id))
+                                    {
+                                        <MudSelectItem Value="@version">@version.Name</MudSelectItem>
+                                    }
+                                }
+                            </MudSelect>
+
+                            @if (patchSourceVersion != null && patchTargetVersion != null)
+                            {
+                                <MudAlert Severity="Severity.Info" Class="mt-3">
+                                    Patch from <strong>@patchSourceVersion.Name</strong> to <strong>@patchTargetVersion.Name</strong>
+                                </MudAlert>
+                            }
+                        </MudCardContent>
+                        <MudCardActions>
+                            <MudButton Variant="Variant.Filled" Color="Color.Primary" Disabled="@(patchSourceVersion == null || patchTargetVersion == null)" OnClick="CheckAndDownloadPatch">
+                                Download Patch
+                            </MudButton>
+                        </MudCardActions>
+                    </MudCard>
+                </MudItem>
+
+                <MudItem xs="12" md="6">
+                    @if (availablePatch != null)
+                    {
+                        <MudCard>
+                            <MudCardContent>
+                                <MudText Typo="Typo.h6">Patch Available</MudText>
+                                <MudSimpleTable Dense="true" Class="mt-3">
+                                    <tbody>
+                                        <tr>
+                                            <td><strong>Patch Size:</strong></td>
+                                            <td>@FormatFileSize(availablePatch.PatchSize)</td>
+                                        </tr>
+                                        <tr>
+                                            <td><strong>Status:</strong></td>
+                                            <td>
+                                                <MudChip Color="Color.Success" Size="Size.Small">
+                                                    Ready
+                                                </MudChip>
+                                            </td>
+                                        </tr>
+                                        <tr>
+                                            <td><strong>Created:</strong></td>
+                                            <td>@availablePatch.CreatedAt.ToLocalTime().ToString("g")</td>
+                                        </tr>
+                                    </tbody>
+                                </MudSimpleTable>
+                            </MudCardContent>
+                        </MudCard>
+                    }
+                </MudItem>
+            </MudGrid>
+        </MudTabPanel>
+
+        <MudTabPanel Text="Quick Downloads">
+            <MudGrid>
+                <MudItem xs="12">
+                    <MudText Typo="Typo.h6" Class="mb-3">Latest Versions</MudText>
+                </MudItem>
+                @if (versions != null && versions.Any())
+                {
+                    @foreach (var version in versions.Take(3))
+                    {
+                        <MudItem xs="12">
+                            <MudPaper Class="pa-3 d-flex align-center">
+                                <MudIcon Icon="@Icons.Material.Filled.Archive" Color="Color.Primary" Class="mr-3" />
+                                <div class="flex-grow-1">
+                                    <MudText Typo="Typo.subtitle1">@version.Name</MudText>
+                                    <MudText Typo="Typo.body2">Size: @FormatFileSize(version.Size) | Created: @version.CreatedAt.ToLocalTime().ToString("d")</MudText>
+                                </div>
+                                <MudButton Variant="Variant.Text" Color="Color.Primary" StartIcon="@Icons.Material.Filled.Download" OnClick="@(() => DownloadVersion(version))">
+                                    Download
+                                </MudButton>
+                            </MudPaper>
+                        </MudItem>
+                    }
+                }
+            </MudGrid>
+        </MudTabPanel>
+    </MudTabs>
+</MudContainer>
+
+@code {
+    private List<AppVersion>? versions;
+    private AppVersion? patchSourceVersion;
+    private AppVersion? patchTargetVersion;
+    private Patch? availablePatch;
+
+    protected override async Task OnInitializedAsync()
+    {
+        versions = await VersionService.GetAllVersionsAsync();
+    }
+
+    private async Task CheckAndDownloadPatch()
+    {
+        if (patchSourceVersion == null || patchTargetVersion == null)
+            return;
+
+        try
+        {
+            availablePatch = await PatchService.GetPatchAsync(patchSourceVersion.Id, patchTargetVersion.Id);
+
+            if (availablePatch == null || availablePatch.Status != PatchStatus.Completed)
+            {
+                Snackbar.Add("Patch not available. Generating patch now...", Severity.Info);
+                availablePatch = await PatchService.GeneratePatchAsync(patchSourceVersion.Id, patchTargetVersion.Id);
+            }
+
+            if (availablePatch.Status == PatchStatus.Completed)
+            {
+                await DownloadPatch(availablePatch);
+            }
+            else
+            {
+                Snackbar.Add($"Patch generation failed: {availablePatch.ErrorMessage}", Severity.Error);
+            }
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Error: {ex.Message}", Severity.Error);
+        }
+    }
+
+    private async Task DownloadVersion(AppVersion version)
+    {
+        try
+        {
+            var fileBytes = await StorageService.GetVersionArchiveAsync(version.StoragePath);
+            var fileName = $"{version.Name}.zip";
+            await JSRuntime.InvokeVoidAsync("downloadFile", fileName, Convert.ToBase64String(fileBytes));
+            Snackbar.Add($"Downloaded {fileName}", Severity.Success);
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Error downloading version: {ex.Message}", Severity.Error);
+        }
+    }
+
+    private async Task DownloadPatch(Patch patch)
+    {
+        try
+        {
+            var fileBytes = await PatchService.GetPatchFileAsync(patch.Id);
+            var fileName = $"{patch.SourceVersion?.Name}_to_{patch.TargetVersion?.Name}.patch";
+            await JSRuntime.InvokeVoidAsync("downloadFile", fileName, Convert.ToBase64String(fileBytes));
+            Snackbar.Add($"Downloaded {fileName}", Severity.Success);
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Error downloading patch: {ex.Message}", Severity.Error);
+        }
+    }
+
+    private string FormatFileSize(long bytes)
+    {
+        string[] sizes = { "B", "KB", "MB", "GB", "TB" };
+        int order = 0;
+        double size = bytes;
+        while (size >= 1024 && order < sizes.Length - 1)
+        {
+            order++;
+            size = size / 1024;
+        }
+        return $"{size:0.##} {sizes[order]}";
+    }
+}
