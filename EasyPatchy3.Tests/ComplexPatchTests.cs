@@ -28,7 +28,7 @@ namespace EasyPatchy3.Tests
 
             _context = new ApplicationDbContext(options);
             _context.Database.EnsureCreated();
-
+             
             _testStorageRoot = Path.Combine(Path.GetTempPath(), "EasyPatchy3ComplexTests", Guid.NewGuid().ToString());
             Directory.CreateDirectory(_testStorageRoot);
 

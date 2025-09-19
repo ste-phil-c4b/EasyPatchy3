@@ -1,0 +1,115 @@
+@page "/history"
+@inject LocalAppService LocalAppService
+@inject ISnackbar Snackbar
+
+<PageTitle>History - EasyPatchy3 Launcher</PageTitle>
+
+<MudGrid>
+    <MudItem xs="12">
+        <MudText Typo="Typo.h4" GutterBottom="true">Installation History</MudText>
+        <MudText Typo="Typo.body1">View your local application versions</MudText>
+    </MudItem>
+
+    <MudItem xs="12">
+        <MudButton OnClick="LoadHistory" Disabled="_loading"
+                   StartIcon="Icons.Material.Filled.Refresh" Variant="Variant.Filled" Color="Color.Primary">
+            Refresh History
+        </MudButton>
+    </MudItem>
+
+    @if (_loading)
+    {
+        <MudItem xs="12">
+            <MudProgressLinear Color="Color.Primary" Indeterminate="true" />
+            <MudText>Loading history...</MudText>
+        </MudItem>
+    }
+
+    @if (_localVersions.Any())
+    {
+        <MudItem xs="12">
+            <MudTable Items="_localVersions" Hover="true">
+                <HeaderContent>
+                    <MudTh>Name</MudTh>
+                    <MudTh>Size</MudTh>
+                    <MudTh>Installed</MudTh>
+                    <MudTh>Actions</MudTh>
+                </HeaderContent>
+                <RowTemplate>
+                    <MudTd>@context.Name</MudTd>
+                    <MudTd>@FormatFileSize(context.Size)</MudTd>
+                    <MudTd>@context.InstalledAt.ToString("yyyy-MM-dd HH:mm")</MudTd>
+                    <MudTd>
+                        <MudButton Size="Size.Small" Variant="Variant.Outlined" Color="Color.Error"
+                                   OnClick="() => DeleteVersion(context.Name)">
+                            Delete
+                        </MudButton>
+                    </MudTd>
+                </RowTemplate>
+            </MudTable>
+        </MudItem>
+    }
+    else if (!_loading)
+    {
+        <MudItem xs="12">
+            <MudAlert Severity="Severity.Info">No local versions found</MudAlert>
+        </MudItem>
+    }
+</MudGrid>
+
+@code {
+    private List<LocalAppVersion> _localVersions = new();
+    private bool _loading = false;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadHistory();
+    }
+
+    private async Task LoadHistory()
+    {
+        _loading = true;
+        StateHasChanged();
+
+        try
+        {
+            _localVersions = await LocalAppService.GetInstalledVersionsAsync();
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Failed to load history: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            _loading = false;
+            StateHasChanged();
+        }
+    }
+
+    private async Task DeleteVersion(string versionName)
+    {
+        try
+        {
+            await LocalAppService.DeleteVersionAsync(versionName);
+            Snackbar.Add($"Deleted version {versionName}", Severity.Success);
+            await LoadHistory();
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Failed to delete version: {ex.Message}", Severity.Error);
+        }
+    }
+
+    private string FormatFileSize(long bytes)
+    {
+        string[] sizes = { "B", "KB", "MB", "GB" };
+        double len = bytes;
+        int order = 0;
+        while (len >= 1024 && order < sizes.Length - 1)
+        {
+            order++;
+            len /= 1024;
+        }
+        return $"{len:0.##} {sizes[order]}";
+    }
+}

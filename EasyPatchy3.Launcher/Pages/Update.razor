@@ -1,0 +1,396 @@
+@page "/update"
+@inject UpdateService UpdateService
+@inject LocalAppService LocalAppService
+@inject ApiService ApiService
+@inject ISnackbar Snackbar
+
+<PageTitle>Update - EasyPatchy3 Launcher</PageTitle>
+
+<MudGrid>
+    <MudItem xs="12">
+        <MudText Typo="Typo.h4" GutterBottom="true">Application Management</MudText>
+        <MudText Typo="Typo.body1">
+            @if (_currentVersion == null)
+            {
+                <text>No version installed. Select a version to install.</text>
+            }
+            else
+            {
+                <text>Current version: @_currentVersion.Name. Select a version to update or reinstall.</text>
+            }
+        </MudText>
+    </MudItem>
+
+    <MudItem xs="12" md="6">
+        <MudCard>
+            <MudCardHeader>
+                <CardHeaderContent>
+                    <MudText Typo="Typo.h6">Current Installation</MudText>
+                </CardHeaderContent>
+                <CardHeaderActions>
+                    <MudIconButton Icon="@Icons.Material.Filled.Refresh" Color="Color.Default" OnClick="LoadCurrentVersion" />
+                </CardHeaderActions>
+            </MudCardHeader>
+            <MudCardContent>
+                @if (_currentVersion != null)
+                {
+                    <MudText><strong>Version:</strong> @_currentVersion.Name</MudText>
+                    <MudText><strong>Installed:</strong> @_currentVersion.InstalledAt.ToString("yyyy-MM-dd HH:mm")</MudText>
+                    <MudText><strong>Size:</strong> @FormatFileSize(_currentVersion.Size)</MudText>
+                }
+                else
+                {
+                    <MudAlert Severity="Severity.Warning" Icon="@Icons.Material.Filled.Warning">
+                        No application version installed
+                    </MudAlert>
+                    <MudText Class="mt-3" Typo="Typo.body2">
+                        Select a version from the available versions to install.
+                    </MudText>
+                }
+            </MudCardContent>
+        </MudCard>
+    </MudItem>
+
+    <MudItem xs="12" md="6">
+        <MudCard>
+            <MudCardHeader>
+                <CardHeaderContent>
+                    <MudText Typo="Typo.h6">Available Versions</MudText>
+                </CardHeaderContent>
+                <CardHeaderActions>
+                    <MudIconButton Icon="@Icons.Material.Filled.Refresh" Color="Color.Default" OnClick="LoadAvailableVersions" />
+                </CardHeaderActions>
+            </MudCardHeader>
+            <MudCardContent>
+                @if (_loading)
+                {
+                    <MudProgressLinear Color="Color.Primary" Indeterminate="true" />
+                    <MudText>Loading versions...</MudText>
+                }
+                else if (_availableVersions.Any())
+                {
+                    <MudSelect T="string" @bind-Value="_selectedVersion" Label="Select Version" Variant="Variant.Outlined">
+                        @foreach (var version in _availableVersions)
+                        {
+                            <MudSelectItem Value="@version.Name">
+                                @version.Name
+                                @if (version.Description != null)
+                                {
+                                    <text> - @version.Description</text>
+                                }
+                                <text> (@FormatFileSize(version.Size))</text>
+                            </MudSelectItem>
+                        }
+                    </MudSelect>
+
+                    @if (!string.IsNullOrEmpty(_selectedVersion))
+                    {
+                        var selected = _availableVersions.FirstOrDefault(v => v.Name == _selectedVersion);
+                        if (selected != null)
+                        {
+                            <MudText Class="mt-2" Typo="Typo.caption">
+                                Created: @selected.CreatedAt.ToString("yyyy-MM-dd HH:mm")
+                            </MudText>
+                        }
+                    }
+                }
+                else
+                {
+                    <MudAlert Severity="Severity.Info">No versions available on server</MudAlert>
+                }
+            </MudCardContent>
+        </MudCard>
+    </MudItem>
+
+    @if (_updateStrategy != null)
+    {
+        <MudItem xs="12">
+            <MudCard>
+                <MudCardHeader>
+                    <CardHeaderContent>
+                        <MudText Typo="Typo.h6">Installation Strategy</MudText>
+                    </CardHeaderContent>
+                </MudCardHeader>
+                <MudCardContent>
+                    <MudAlert Severity="@GetStrategySeverity(_updateStrategy.Type)">
+                        <strong>@GetStrategyTitle(_updateStrategy.Type):</strong> @_updateStrategy.ReasonCode
+                    </MudAlert>
+
+                    @if (_updateStrategy.Type == UpdateType.PatchUpdate && _updateStrategy.Patch != null)
+                    {
+                        <MudGrid Class="mt-3">
+                            <MudItem xs="6">
+                                <MudText><strong>Patch Size:</strong> @FormatFileSize(_updateStrategy.Patch.PatchSize)</MudText>
+                            </MudItem>
+                            <MudItem xs="6">
+                                <MudText><strong>Full Size:</strong> @FormatFileSize(_updateStrategy.TargetVersion.Size)</MudText>
+                            </MudItem>
+                            <MudItem xs="12">
+                                <MudText Color="Color.Success">
+                                    <strong>Savings:</strong> @FormatFileSize(_updateStrategy.TargetVersion.Size - _updateStrategy.Patch.PatchSize)
+                                    (@($"{(double)(_updateStrategy.TargetVersion.Size - _updateStrategy.Patch.PatchSize) / _updateStrategy.TargetVersion.Size * 100:F1}")%)
+                                </MudText>
+                            </MudItem>
+                        </MudGrid>
+                    }
+                    else if (_updateStrategy.Type == UpdateType.FullDownload)
+                    {
+                        <MudText Class="mt-3"><strong>Download Size:</strong> @FormatFileSize(_updateStrategy.TargetVersion.Size)</MudText>
+                    }
+                </MudCardContent>
+            </MudCard>
+        </MudItem>
+    }
+
+    @if (_updateInProgress)
+    {
+        <MudItem xs="12">
+            <MudCard>
+                <MudCardHeader>
+                    <CardHeaderContent>
+                        <MudText Typo="Typo.h6">Progress</MudText>
+                    </CardHeaderContent>
+                </MudCardHeader>
+                <MudCardContent>
+                    <MudProgressLinear Color="Color.Primary" Value="_updateProgress.Percentage" Class="mb-3" Size="Size.Large" />
+                    <MudText>@_updateProgress.Stage</MudText>
+                    <MudText Typo="Typo.caption" Color="Color.Primary">@_updateProgress.Percentage% Complete</MudText>
+                </MudCardContent>
+            </MudCard>
+        </MudItem>
+    }
+
+    <MudItem xs="12">
+        <MudStack Row="true" Spacing="3">
+            <MudButton OnClick="AnalyzeUpdate"
+                       Disabled="@(string.IsNullOrEmpty(_selectedVersion) || _updateInProgress)"
+                       StartIcon="@Icons.Material.Filled.Analytics"
+                       Variant="Variant.Outlined"
+                       Color="Color.Primary">
+                Analyze
+            </MudButton>
+
+            <MudButton OnClick="StartUpdate"
+                       Disabled="@(_updateStrategy == null || _updateStrategy.Type == UpdateType.NoUpdateNeeded || _updateInProgress)"
+                       StartIcon="@GetUpdateIcon()"
+                       Variant="Variant.Filled"
+                       Color="@GetUpdateColor()">
+                @GetUpdateButtonText()
+            </MudButton>
+
+            @if (_currentVersion == null && !string.IsNullOrEmpty(_selectedVersion) && !_updateInProgress)
+            {
+                <MudButton OnClick="DirectInstall"
+                           StartIcon="@Icons.Material.Filled.Download"
+                           Variant="Variant.Filled"
+                           Color="Color.Success">
+                    Quick Install
+                </MudButton>
+            }
+        </MudStack>
+    </MudItem>
+</MudGrid>
+
+@code {
+    private LocalAppVersion? _currentVersion;
+    private List<AppVersionDto> _availableVersions = new();
+    private string _selectedVersion = string.Empty;
+    private UpdateStrategy? _updateStrategy;
+    private bool _loading = false;
+    private bool _updateInProgress = false;
+    private UpdateProgress _updateProgress = new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadCurrentVersion();
+        await LoadAvailableVersions();
+    }
+
+    private async Task LoadCurrentVersion()
+    {
+        try
+        {
+            _currentVersion = await LocalAppService.GetCurrentVersionAsync();
+        }
+        catch
+        {
+            _currentVersion = null;
+        }
+        StateHasChanged();
+    }
+
+    private async Task LoadAvailableVersions()
+    {
+        _loading = true;
+        StateHasChanged();
+
+        try
+        {
+            _availableVersions = await ApiService.GetAvailableVersionsAsync();
+            _availableVersions = _availableVersions.OrderByDescending(v => v.CreatedAt).ToList();
+
+            // Auto-select the latest version if no version is installed
+            if (_currentVersion == null && _availableVersions.Any())
+            {
+                _selectedVersion = _availableVersions.First().Name;
+            }
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Failed to load versions: {ex.Message}", Severity.Error);
+            _availableVersions = new List<AppVersionDto>();
+        }
+        finally
+        {
+            _loading = false;
+            StateHasChanged();
+        }
+    }
+
+    private async Task AnalyzeUpdate()
+    {
+        if (string.IsNullOrEmpty(_selectedVersion))
+            return;
+
+        _loading = true;
+        _updateStrategy = null;
+        StateHasChanged();
+
+        try
+        {
+            _updateStrategy = await UpdateService.DetermineUpdateStrategyAsync(_selectedVersion);
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Failed to analyze: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            _loading = false;
+            StateHasChanged();
+        }
+    }
+
+    private async Task DirectInstall()
+    {
+        if (string.IsNullOrEmpty(_selectedVersion))
+            return;
+
+        // Create a direct install strategy
+        var targetVersion = _availableVersions.FirstOrDefault(v => v.Name == _selectedVersion);
+        if (targetVersion == null)
+        {
+            Snackbar.Add("Selected version not found", Severity.Error);
+            return;
+        }
+
+        _updateStrategy = new UpdateStrategy
+        {
+            Type = UpdateType.FullDownload,
+            TargetVersion = targetVersion,
+            ReasonCode = "Direct installation requested"
+        };
+
+        await StartUpdate();
+    }
+
+    private async Task StartUpdate()
+    {
+        if (_updateStrategy == null)
+            return;
+
+        _updateInProgress = true;
+        _updateProgress = new UpdateProgress { Stage = "Initializing...", Percentage = 0 };
+        StateHasChanged();
+
+        var progress = new Progress<UpdateProgress>(p =>
+        {
+            _updateProgress = p;
+            InvokeAsync(StateHasChanged);
+        });
+
+        try
+        {
+            var success = await UpdateService.ExecuteUpdateAsync(_updateStrategy, progress);
+
+            if (success)
+            {
+                Snackbar.Add("Installation completed successfully!", Severity.Success);
+                await LoadCurrentVersion();
+                _updateStrategy = null;
+            }
+            else
+            {
+                Snackbar.Add("Installation failed!", Severity.Error);
+            }
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Installation failed: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            _updateInProgress = false;
+            _updateProgress = new UpdateProgress { Stage = "", Percentage = 0 };
+            StateHasChanged();
+        }
+    }
+
+    private Severity GetStrategySeverity(UpdateType type) => type switch
+    {
+        UpdateType.NoUpdateNeeded => Severity.Info,
+        UpdateType.PatchUpdate => Severity.Success,
+        UpdateType.FullDownload => Severity.Warning,
+        _ => Severity.Normal
+    };
+
+    private string GetStrategyTitle(UpdateType type) => type switch
+    {
+        UpdateType.NoUpdateNeeded => "No Action Required",
+        UpdateType.PatchUpdate => "Patch Available",
+        UpdateType.FullDownload => "Full Download",
+        _ => "Unknown"
+    };
+
+    private string GetUpdateButtonText()
+    {
+        if (_currentVersion == null)
+            return "Install Version";
+
+        return _updateStrategy?.Type switch
+        {
+            UpdateType.NoUpdateNeeded => "Already Installed",
+            UpdateType.PatchUpdate => "Apply Patch",
+            UpdateType.FullDownload => "Download & Install",
+            _ => "Update"
+        };
+    }
+
+    private string GetUpdateIcon() => _updateStrategy?.Type switch
+    {
+        UpdateType.PatchUpdate => Icons.Material.Filled.BuildCircle,
+        UpdateType.FullDownload => Icons.Material.Filled.Download,
+        _ => Icons.Material.Filled.Update
+    };
+
+    private Color GetUpdateColor() => _updateStrategy?.Type switch
+    {
+        UpdateType.NoUpdateNeeded => Color.Default,
+        UpdateType.PatchUpdate => Color.Success,
+        UpdateType.FullDownload => Color.Primary,
+        _ => Color.Primary
+    };
+
+    private string FormatFileSize(long bytes)
+    {
+        string[] sizes = { "B", "KB", "MB", "GB" };
+        double len = bytes;
+        int order = 0;
+        while (len >= 1024 && order < sizes.Length - 1)
+        {
+            order++;
+            len /= 1024;
+        }
+        return $"{len:0.##} {sizes[order]}";
+    }
+}

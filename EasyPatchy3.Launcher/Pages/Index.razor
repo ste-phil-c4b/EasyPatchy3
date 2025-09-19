@@ -1,0 +1,169 @@
+@page "/"
+@using EasyPatchy3.Launcher.Services
+@using EasyPatchy3.Launcher.Models
+@inject LocalAppService LocalAppService
+@inject ApiService ApiService
+
+<PageTitle>EasyPatchy3 Launcher</PageTitle>
+
+<MudGrid>
+    <MudItem xs="12">
+        <MudText Typo="Typo.h4" GutterBottom="true">EasyPatchy3 Launcher</MudText>
+        <MudText Typo="Typo.body1">Manage your application versions and updates</MudText>
+    </MudItem>
+
+    <MudItem xs="12" md="6">
+        <MudCard>
+            <MudCardHeader>
+                <CardHeaderContent>
+                    <MudText Typo="Typo.h6">Current Version</MudText>
+                </CardHeaderContent>
+                <CardHeaderActions>
+                    <MudIconButton Icon="Icons.Material.Filled.Refresh" Color="Color.Default" OnClick="LoadCurrentVersion" />
+                </CardHeaderActions>
+            </MudCardHeader>
+            <MudCardContent>
+                @if (_currentVersion != null)
+                {
+                    <MudText><strong>Version:</strong> @_currentVersion.Name</MudText>
+                    <MudText><strong>Installed:</strong> @_currentVersion.InstalledAt.ToString("yyyy-MM-dd HH:mm")</MudText>
+                    <MudText><strong>Size:</strong> @FormatFileSize(_currentVersion.Size)</MudText>
+                }
+                else if (_loading)
+                {
+                    <MudProgressLinear Color="Color.Primary" Indeterminate="true" />
+                    <MudText>Loading...</MudText>
+                }
+                else
+                {
+                    <MudText Color="Color.Warning">No version installed</MudText>
+                }
+            </MudCardContent>
+        </MudCard>
+    </MudItem>
+
+    <MudItem xs="12" md="6">
+        <MudCard>
+            <MudCardHeader>
+                <CardHeaderContent>
+                    <MudText Typo="Typo.h6">Server Status</MudText>
+                </CardHeaderContent>
+                <CardHeaderActions>
+                    <MudIconButton Icon="Icons.Material.Filled.Refresh" Color="Color.Default" OnClick="CheckServerStatus" />
+                </CardHeaderActions>
+            </MudCardHeader>
+            <MudCardContent>
+                @if (_serverAvailable.HasValue)
+                {
+                    if (_serverAvailable.Value)
+                    {
+                        <MudAlert Severity="Severity.Success">Server is available</MudAlert>
+                        <MudText><strong>Available versions:</strong> @_availableVersionsCount</MudText>
+                    }
+                    else
+                    {
+                        <MudAlert Severity="Severity.Error">Server is not available</MudAlert>
+                    }
+                }
+                else if (_loading)
+                {
+                    <MudProgressLinear Color="Color.Primary" Indeterminate="true" />
+                    <MudText>Checking server...</MudText>
+                }
+            </MudCardContent>
+        </MudCard>
+    </MudItem>
+
+    <MudItem xs="12">
+        <MudCard>
+            <MudCardHeader>
+                <CardHeaderContent>
+                    <MudText Typo="Typo.h6">Quick Actions</MudText>
+                </CardHeaderContent>
+            </MudCardHeader>
+            <MudCardContent>
+                <MudStack Row="true" Spacing="3">
+                    <MudButton Href="/update" StartIcon="Icons.Material.Filled.Update" Variant="Variant.Filled" Color="Color.Primary">
+                        Update Application
+                    </MudButton>
+                    <MudButton Href="/versions" StartIcon="Icons.Material.Filled.Inventory" Variant="Variant.Outlined" Color="Color.Secondary">
+                        View Versions
+                    </MudButton>
+                    <MudButton Href="/history" StartIcon="Icons.Material.Filled.History" Variant="Variant.Outlined" Color="Color.Secondary">
+                        Update History
+                    </MudButton>
+                </MudStack>
+            </MudCardContent>
+        </MudCard>
+    </MudItem>
+</MudGrid>
+
+@code {
+    private LocalAppVersion? _currentVersion;
+    private bool? _serverAvailable;
+    private int _availableVersionsCount;
+    private bool _loading = false;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadCurrentVersion();
+        await CheckServerStatus();
+    }
+
+    private async Task LoadCurrentVersion()
+    {
+        _loading = true;
+        StateHasChanged();
+
+        try
+        {
+            _currentVersion = await LocalAppService.GetCurrentVersionAsync();
+        }
+        catch
+        {
+            _currentVersion = null;
+        }
+        finally
+        {
+            _loading = false;
+            StateHasChanged();
+        }
+    }
+
+    private async Task CheckServerStatus()
+    {
+        _loading = true;
+        _serverAvailable = null;
+        StateHasChanged();
+
+        try
+        {
+            var versions = await ApiService.GetAvailableVersionsAsync();
+            _serverAvailable = true;
+            _availableVersionsCount = versions.Count;
+        }
+        catch
+        {
+            _serverAvailable = false;
+            _availableVersionsCount = 0;
+        }
+        finally
+        {
+            _loading = false;
+            StateHasChanged();
+        }
+    }
+
+    private string FormatFileSize(long bytes)
+    {
+        string[] sizes = { "B", "KB", "MB", "GB" };
+        double len = bytes;
+        int order = 0;
+        while (len >= 1024 && order < sizes.Length - 1)
+        {
+            order++;
+            len /= 1024;
+        }
+        return $"{len:0.##} {sizes[order]}";
+    }
+}

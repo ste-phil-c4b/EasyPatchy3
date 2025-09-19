@@ -1,0 +1,91 @@
+@page "/versions"
+@inject ApiService ApiService
+@inject ISnackbar Snackbar
+
+<PageTitle>Versions - EasyPatchy3 Launcher</PageTitle>
+
+<MudGrid>
+    <MudItem xs="12">
+        <MudText Typo="Typo.h4" GutterBottom="true">Available Versions</MudText>
+        <MudText Typo="Typo.body1">Browse available application versions</MudText>
+    </MudItem>
+
+    <MudItem xs="12">
+        <MudButton OnClick="LoadVersions" Disabled="_loading"
+                   StartIcon="Icons.Material.Filled.Refresh" Variant="Variant.Filled" Color="Color.Primary">
+            Refresh Versions
+        </MudButton>
+    </MudItem>
+
+    @if (_loading)
+    {
+        <MudItem xs="12">
+            <MudProgressLinear Color="Color.Primary" Indeterminate="true" />
+            <MudText>Loading versions...</MudText>
+        </MudItem>
+    }
+
+    @if (_versions.Any())
+    {
+        <MudItem xs="12">
+            <MudTable Items="_versions" Hover="true">
+                <HeaderContent>
+                    <MudTh>Name</MudTh>
+                    <MudTh>Description</MudTh>
+                    <MudTh>Size</MudTh>
+                    <MudTh>Created</MudTh>
+                </HeaderContent>
+                <RowTemplate>
+                    <MudTd>@context.Name</MudTd>
+                    <MudTd>@(context.Description ?? "-")</MudTd>
+                    <MudTd>@FormatFileSize(context.Size)</MudTd>
+                    <MudTd>@context.CreatedAt.ToString("yyyy-MM-dd HH:mm")</MudTd>
+                </RowTemplate>
+            </MudTable>
+        </MudItem>
+    }
+</MudGrid>
+
+@code {
+    private List<AppVersionDto> _versions = new();
+    private bool _loading = false;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadVersions();
+    }
+
+    private async Task LoadVersions()
+    {
+        _loading = true;
+        StateHasChanged();
+
+        try
+        {
+            _versions = await ApiService.GetAvailableVersionsAsync();
+            _versions = _versions.OrderByDescending(v => v.CreatedAt).ToList();
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Failed to load versions: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            _loading = false;
+            StateHasChanged();
+        }
+    }
+
+    private string FormatFileSize(long bytes)
+    {
+        string[] sizes = { "B", "KB", "MB", "GB" };
+        double len = bytes;
+        int order = 0;
+        while (len >= 1024 && order < sizes.Length - 1)
+        {
+            order++;
+            len /= 1024;
+        }
+        return $"{len:0.##} {sizes[order]}";
+    }
+}

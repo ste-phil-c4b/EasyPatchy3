@@ -7,6 +7,7 @@ namespace EasyPatchy3.Services
         Task<string> SaveVersionAsync(string folderPath, string versionName);
         Task<string> SavePatchAsync(byte[] patchData, string sourceVersion, string targetVersion);
         Task<byte[]> GetVersionArchiveAsync(string storagePath);
+        Task<byte[]?> GetVersionArchiveAsync(string versionName, bool useVersionName);
         Task<byte[]> GetPatchAsync(string patchPath);
         Task DeleteVersionAsync(string storagePath);
         Task DeletePatchAsync(string patchPath);

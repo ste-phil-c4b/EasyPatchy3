@@ -14,7 +14,8 @@
       "Bash(docker logs:*)",
       "Bash(docker exec:*)",
       "Bash(dotnet sln add:*)",
-      "Bash(dotnet test:*)"
+      "Bash(dotnet test:*)",
+      "Bash(dotnet build:*)"
     ],
     "deny": [],
     "ask": []

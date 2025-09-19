@@ -52,6 +52,18 @@ namespace EasyPatchy3.Services
             return await File.ReadAllBytesAsync(storagePath);
         }
 
+        public async Task<byte[]?> GetVersionArchiveAsync(string versionName, bool useVersionName = true)
+        {
+            var versionPath = GetVersionPath(versionName) + ".zip";
+
+            if (!File.Exists(versionPath))
+            {
+                return null;
+            }
+
+            return await File.ReadAllBytesAsync(versionPath);
+        }
+
         public async Task<byte[]> GetPatchAsync(string patchPath)
         {
             if (!File.Exists(patchPath))

@@ -37,9 +37,30 @@ services:
       - easypatch3-network
     restart: unless-stopped
 
+  launcher:
+    build:
+      context: ./EasyPatchy3.Launcher
+      dockerfile: Dockerfile
+    container_name: easypatch3-launcher
+    environment:
+      EasyPatchyApiBaseUrl: "http://easypatch3-app:8080"
+      ASPNETCORE_ENVIRONMENT: Production
+    ports:
+      - "8081:8080"
+    volumes:
+      - launcher-storage:/app/LocalApps
+      - launcher-temp:/app/Temp
+    depends_on:
+      - app
+    networks:
+      - easypatch3-network
+    restart: unless-stopped
+
 networks:
   easypatch3-network:
     driver: bridge
 
 volumes:
   postgres-data:
+  launcher-storage:
+  launcher-temp:
